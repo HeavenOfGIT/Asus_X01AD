@@ -945,10 +945,7 @@ static int allnode_mutual_cdc_data(int index)
 	ipio_info("Check busy method = %d\n", core_mp->busy_cdc);
 	if (core_mp->busy_cdc == POLL_CHECK) {
 		res = core_config_check_cdc_busy(50, 50);
-	} else if (core_mp->busy_cdc == INT_CHECK) {
-		res = core_config_check_int_status(false);
-	} else if (core_mp->busy_cdc == DELAY_CHECK) {
-		mdelay(600);
+	
 	}
 
 	if (res < 0) {
@@ -1337,10 +1334,6 @@ int allnode_open_cdc_data(int mode, int *buf, int *dac)
 	/* Check busy */
 	ipio_info("Check busy method = %d\n", core_mp->busy_cdc);
 	if (core_mp->busy_cdc == POLL_CHECK) {
-		res = core_config_check_cdc_busy(100, 50);
-	} else if (core_mp->busy_cdc == INT_CHECK) {
-		res = core_config_check_int_status(false);
-	} else if (core_mp->busy_cdc == DELAY_CHECK) {
 		mdelay(600);
 	}
 
