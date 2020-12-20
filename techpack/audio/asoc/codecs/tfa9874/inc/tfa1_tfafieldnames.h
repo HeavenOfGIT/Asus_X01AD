@@ -1,6 +1,10 @@
-/** Filename: Tfa1_TfaFieldnames.h
- *  This file was generated automatically on 03/20/2015 at 01:55:46 PM. 
- *  Source file: TFA9897N1B_I2C_list_URT_Source_v34.xls
+/*
+ * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
  */
 #define TFA9897_I2CVERSION 34
 typedef enum nxpTfa1BfEnumList {
@@ -184,6 +188,11 @@ typedef enum nxpTfa1BfEnumList {
     TFA1_BF_ACK   = 0x7387,    /*!< acknowledge of requests (8 channels)               */
     TFA1_BF_MTPOTC= 0x8000,    /*!< Calibration schedule (key2 protected)              */
     TFA1_BF_MTPEX = 0x8010,    /*!< (key2 protected)                                   */
+    /* huaqin add for 1246411 by xudayi at 2018/11/06 start */
+    TFA1_BF_TDMNBCK1 = 0x20c3,    /*!< N-BCK's in FS                                   */
+    TFA1_BF_TDMSLLN1 = 0x2144,    /*!< N-bits in slot                              	 */
+    TFA1_BF_TDMSSIZE1 = 0x2224,   /*!< Sample size per slot                            */
+    /* huaqin add for 1246411 by xudayi at 2018/11/06 end */
 } nxpTfa1BfEnumList_t;
 #define TFA1_NAMETABLE static tfaBfName_t Tfa1DatasheetNames[]= {\
    { 0x0, "VDDS"},    /* Power-on-reset flag                               , */\

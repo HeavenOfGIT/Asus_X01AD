@@ -1,23 +1,14 @@
 /*
- * tfa98xx.c   tfa98xx codec module
+ * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
  *
- * Copyright 2014-2017 NXP Semiconductors
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 #define pr_fmt(fmt) "%s(): " fmt, __func__
- 
+
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <sound/core.h>
@@ -539,7 +530,7 @@ static ssize_t tfa98xx_dbgfs_start_set(struct file *file,
 	enum tfa_error ret;
 	char buf[32];
 	const char ref[] = "please calibrate now";
-	int buf_size;
+	int buf_size, cal_profile = 0;
 
 	/* check string length, and account for eol */
 	if (count > sizeof(ref) + 1 || count < (sizeof(ref) - 1))
@@ -556,10 +547,17 @@ static ssize_t tfa98xx_dbgfs_start_set(struct file *file,
 
 	mutex_lock(&tfa98xx->dsp_lock);
 	ret = tfa_calibrate(tfa98xx->tfa);
+	if (ret == tfa_error_ok) {
+		cal_profile = tfaContGetCalProfile(tfa98xx->tfa);
+		if (cal_profile < 0) {
+			pr_warn("[0x%x] Calibration profile not found\n",
+			        tfa98xx->i2c->addr);
+		}
+
+		ret = tfa98xx_tfa_start(tfa98xx, cal_profile, tfa98xx->vstep);
+	}
 	if (ret == tfa_error_ok)
-		ret = tfa98xx_tfa_start(tfa98xx, tfa98xx->profile, tfa98xx->vstep);
-	if (ret == tfa_error_ok)
-			tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE);
+			tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE,0);
 	mutex_unlock(&tfa98xx->dsp_lock);
 
 	if (ret) {
@@ -1020,23 +1018,23 @@ static void tfa98xx_debug_init(struct tfa98xx *tfa98xx, struct i2c_client *i2c)
 	scnprintf(name, MAX_CONTROL_NAME, "%s-%x", i2c->name, i2c->addr);
 	tfa98xx->dbg_dir = debugfs_create_dir(name, NULL);
 /* Huaqin modify for M1852-493 by lanshiming at 2018/06/09 start*/
-	debugfs_create_file("OTC", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("OTC", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_calib_otc_fops);
-	debugfs_create_file("MTPEX", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("MTPEX", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_calib_mtpex_fops);
-	debugfs_create_file("TEMP", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("TEMP", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_calib_temp_fops);
-	debugfs_create_file("calibrate", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("calibrate", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_calib_start_fops);
 	debugfs_create_file("R", S_IRUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_r_fops);
 	debugfs_create_file("version", S_IRUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_version_fops);
-	debugfs_create_file("dsp-state", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("dsp-state", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_dsp_state_fops);
-	debugfs_create_file("fw-state", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("fw-state", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_fw_state_fops);
-	debugfs_create_file("rpc", S_IRUGO, tfa98xx->dbg_dir,
+	debugfs_create_file("rpc", S_IRUGO|S_IWUGO, tfa98xx->dbg_dir,
 						i2c, &tfa98xx_dbgfs_rpc_fops);
 /* Huaqin modify for M1852-493 by lanshiming at 2018/06/09 end*/
 	if (tfa98xx->flags & TFA98XX_FLAG_SAAM_AVAILABLE) {
@@ -1270,7 +1268,7 @@ static int tfa98xx_set_vstep(struct snd_kcontrol *kcontrol,
 	if (change) {
 		list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
 			mutex_lock(&tfa98xx->dsp_lock);
-			tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE);
+			tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE,0);
 			mutex_unlock(&tfa98xx->dsp_lock);
 		}
 	}
@@ -1383,7 +1381,7 @@ static int tfa98xx_set_profile(struct snd_kcontrol *kcontrol,
 	if (change) {
 		list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
 			mutex_lock(&tfa98xx->dsp_lock);
-			tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE);
+			tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE,0);
 			mutex_unlock(&tfa98xx->dsp_lock);
 		}
 	}
@@ -2462,7 +2460,6 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 		return;
 	}
 
-	mutex_lock(&tfa98xx_mutex);
 	mutex_lock(&tfa98xx->dsp_lock);
 
 	tfa98xx->dsp_init = TFA98XX_DSP_INIT_PENDING;
@@ -2520,12 +2517,15 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 		tfa98xx->init_count = 0;
 	}
 	mutex_unlock(&tfa98xx->dsp_lock);
-	mutex_unlock(&tfa98xx_mutex);
 
 	if (sync) {
 		/* check if all devices have started */
 		bool do_sync;
 		mutex_lock(&tfa98xx_mutex);
+
+		if (tfa98xx_sync_count < tfa98xx_device_count)
+			tfa98xx_sync_count++;
+
 		do_sync = (tfa98xx_sync_count >= tfa98xx_device_count);
 		mutex_unlock(&tfa98xx_mutex);
 
@@ -2534,7 +2534,7 @@ static void tfa98xx_dsp_init(struct tfa98xx *tfa98xx)
 			tfa98xx_sync_count = 0;
 			list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
 				mutex_lock(&tfa98xx->dsp_lock);
-				tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE);
+				tfa_dev_set_state(tfa98xx->tfa, TFA_STATE_UNMUTE,0);
 
 				/*
 				 * start monitor thread to check IC status bit
